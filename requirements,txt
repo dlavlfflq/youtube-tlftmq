@@ -1,0 +1,9 @@
+streamlit
+pandas
+numpy
+plotly
+matplotlib
+wordcloud
+google-api-python-client
+textblob
+nltk
