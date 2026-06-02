@@ -1,4 +1,3 @@
-
 import streamlit as st
 import pandas as pd
 import re
@@ -11,7 +10,14 @@ from wordcloud import WordCloud
 from googleapiclient.discovery import build
 
 # =========================
-# 설정
+# 한글 폰트 설정 (중요)
+# =========================
+
+plt.rcParams["font.family"] = "NanumGothic"
+plt.rcParams["axes.unicode_minus"] = False
+
+# =========================
+# Streamlit 설정
 # =========================
 
 st.set_page_config(
@@ -20,6 +26,8 @@ st.set_page_config(
 )
 
 st.title("📺 YouTube 댓글 분석기")
+
+st.markdown("유튜브 영상 댓글을 수집하고 분석합니다.")
 
 # =========================
 # API KEY
@@ -34,7 +42,7 @@ youtube = build(
 )
 
 # =========================
-# 유튜브 ID 추출
+# 유튜브 영상 ID 추출
 # =========================
 
 def get_video_id(url):
@@ -99,7 +107,7 @@ def get_comments(video_id, limit):
 # 좋아요 기반 단어 분석
 # =========================
 
-def top_liked_words(df):
+def get_top_liked_words(df):
 
     counter = Counter()
 
@@ -107,7 +115,7 @@ def top_liked_words(df):
         "이","그","저","것","수","등",
         "은","는","이","가","을","를",
         "에","의","와","과","도","만",
-        "너무","진짜","정말","그리고","영상","진짜"
+        "너무","진짜","정말","그리고","영상","ㅋㅋ","ㅎㅎ"
     }
 
     for _, row in df.iterrows():
@@ -138,7 +146,7 @@ def top_liked_words(df):
     ).head(20)
 
 # =========================
-# UI 입력
+# 입력 UI
 # =========================
 
 url = st.text_input("유튜브 URL 입력")
@@ -157,12 +165,12 @@ st.info(f"선택된 댓글 수: {comment_limit:,}개")
 # 실행
 # =========================
 
-if st.button("댓글 분석 시작"):
+if st.button("분석 시작"):
 
     video_id = get_video_id(url)
 
     if not video_id:
-        st.error("올바른 유튜브 URL이 아닙니다.")
+        st.error("올바른 유튜브 URL을 입력하세요.")
         st.stop()
 
     with st.spinner("댓글 수집 중..."):
@@ -185,7 +193,7 @@ if st.button("댓글 분석 시작"):
     c2.metric("평균 좋아요", round(df["좋아요"].mean(), 2))
 
     # =========================
-    # TOP 좋아요 댓글
+    # 좋아요 TOP 댓글
     # =========================
 
     st.subheader("🔥 좋아요 TOP 댓글")
@@ -201,7 +209,7 @@ if st.button("댓글 분석 시작"):
 
     st.subheader("🔥 좋아요 기반 TOP20 단어")
 
-    top_words = top_liked_words(df)
+    top_words = get_top_liked_words(df)
 
     fig = px.bar(
         top_words,
@@ -216,7 +224,7 @@ if st.button("댓글 분석 시작"):
     st.plotly_chart(fig, use_container_width=True)
 
     # =========================
-    # 워드클라우드
+    # 워드클라우드 (한글 포함)
     # =========================
 
     st.subheader("☁️ 워드클라우드")
@@ -226,7 +234,9 @@ if st.button("댓글 분석 시작"):
     wc = WordCloud(
         width=1200,
         height=600,
-        background_color="white"
+        background_color="white",
+        font_path="NanumGothic.ttf",
+        collocations=False
     ).generate(text)
 
     fig, ax = plt.subplots(figsize=(12,6))
@@ -239,7 +249,7 @@ if st.button("댓글 분석 시작"):
     # 전체 데이터
     # =========================
 
-    st.subheader("📋 전체 데이터")
+    st.subheader("📋 전체 댓글")
 
     st.dataframe(df, use_container_width=True)
 
