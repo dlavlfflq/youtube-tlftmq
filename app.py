@@ -1,12 +1,35 @@
 import streamlit as st
 import pandas as pd
-from googleapiclient.discovery import build
 import re
 
+try:
+    from googleapiclient.discovery import build
+except Exception as e:
+    st.error(
+        "google-api-python-client가 설치되지 않았습니다. requirements.txt를 확인하세요."
+    )
+    st.stop()
+
+# -----------------------------
+# 설정
+# -----------------------------
+
 st.set_page_config(
-    page_title="YouTube Comment Analyzer",
+    page_title="YouTube Comment Collector",
     layout="wide"
 )
+
+st.title("📺 YouTube 댓글 수집기")
+
+# -----------------------------
+# API Key
+# -----------------------------
+
+if "YOUTUBE_API_KEY" not in st.secrets:
+    st.error(
+        "Streamlit Secrets에 YOUTUBE_API_KEY를 등록하세요."
+    )
+    st.stop()
 
 API_KEY = st.secrets["YOUTUBE_API_KEY"]
 
@@ -16,6 +39,9 @@ youtube = build(
     developerKey=API_KEY
 )
 
+# -----------------------------
+# Video ID 추출
+# -----------------------------
 
 def get_video_id(url):
 
@@ -26,6 +52,7 @@ def get_video_id(url):
     ]
 
     for pattern in patterns:
+
         match = re.search(pattern, url)
 
         if match:
@@ -33,8 +60,11 @@ def get_video_id(url):
 
     return None
 
+# -----------------------------
+# 댓글 수집
+# -----------------------------
 
-def get_comments(video_id, max_comments):
+def get_comments(video_id, limit):
 
     comments = []
 
@@ -47,7 +77,7 @@ def get_comments(video_id, max_comments):
 
     progress = st.progress(0)
 
-    while request and len(comments) < max_comments:
+    while request and len(comments) < limit:
 
         response = request.execute()
 
@@ -64,12 +94,12 @@ def get_comments(video_id, max_comments):
 
             progress.progress(
                 min(
-                    len(comments) / max_comments,
+                    len(comments) / limit,
                     1.0
                 )
             )
 
-            if len(comments) >= max_comments:
+            if len(comments) >= limit:
                 break
 
         request = youtube.commentThreads().list_next(
@@ -81,11 +111,12 @@ def get_comments(video_id, max_comments):
 
     return pd.DataFrame(comments)
 
-
-st.title("📺 YouTube 댓글 분석기")
+# -----------------------------
+# 입력
+# -----------------------------
 
 url = st.text_input(
-    "유튜브 URL 입력"
+    "유튜브 URL"
 )
 
 comment_limit = st.slider(
@@ -96,41 +127,49 @@ comment_limit = st.slider(
     step=10
 )
 
-st.write(
-    f"선택된 댓글 수: {comment_limit:,}개"
+st.info(
+    f"선택된 댓글 수 : {comment_limit:,}개"
 )
 
-if st.button("댓글 수집"):
+# -----------------------------
+# 실행
+# -----------------------------
+
+if st.button("댓글 수집 시작"):
 
     video_id = get_video_id(url)
 
     if not video_id:
-        st.error("올바른 유튜브 URL을 입력하세요.")
-        st.stop()
 
-    with st.spinner("댓글 수집 중..."):
-
-        df = get_comments(
-            video_id,
-            comment_limit
+        st.error(
+            "올바른 유튜브 URL을 입력하세요."
         )
 
-    st.success(
-        f"{len(df):,}개 댓글 수집 완료"
-    )
+    else:
 
-    st.dataframe(
-        df,
-        use_container_width=True
-    )
+        with st.spinner("댓글 수집 중..."):
 
-    csv = df.to_csv(
-        index=False
-    ).encode("utf-8-sig")
+            df = get_comments(
+                video_id,
+                comment_limit
+            )
 
-    st.download_button(
-        "CSV 다운로드",
-        csv,
-        "youtube_comments.csv",
-        "text/csv"
-    )
+        st.success(
+            f"{len(df):,}개 댓글 수집 완료"
+        )
+
+        st.dataframe(
+            df,
+            use_container_width=True
+        )
+
+        csv = df.to_csv(
+            index=False
+        ).encode("utf-8-sig")
+
+        st.download_button(
+            "CSV 다운로드",
+            csv,
+            "youtube_comments.csv",
+            "text/csv"
+        )
